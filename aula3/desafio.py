@@ -1,43 +1,74 @@
-# Importando as bibliotecas necessárias
-from sklearn.datasets import load_wine
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.preprocessing import StandardScaler
-from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import accuracy_score, confusion_matrix, precision_score, recall_score, f1_score, roc_curve, auc
-import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+from scipy.spatial import distance
+from sklearn.datasets import load_wine
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler
+from collections import Counter
+from sklearn.metrics import precision_score, recall_score, f1_score
 
-# Carregando o dataset wine
-data = load_wine()
-X = data.data
-y = data.target
+# Função para calcular a distância Euclidiana
+def euclidean_distance(x1, x2):
+    return distance.euclidean(x1, x2)
 
-# Dividindo os dados em treinamento e teste
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=42)
+# Implementação do KNN sem sklearn
+class KNNClassifier:
+    def __init__(self, k=5):
+        self.k = k
+    
+    def fit(self, X, y):
+        self.X_train = X
+        self.y_train = y
+    
+    def predict(self, X):
+        predictions = [self._predict(x) for x in X]
+        return np.array(predictions)
+    
+    def _predict(self, x):
+        distances = [euclidean_distance(x, x_train) for x_train in self.X_train]
+        k_indices = np.argsort(distances)[:self.k]
+        k_nearest_labels = [self.y_train[i] for i in k_indices]
+        most_common = Counter(k_nearest_labels).most_common(1)
+        return most_common[0][0]
 
-# Normalizando as features
+# Carregar dataset
+wine = load_wine()
+X = wine.data
+y = wine.target
+
+# Dividir os dados
+test_size = 0.3
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=test_size, random_state=42)
+
+# Normalizar os dados
 scaler = StandardScaler()
 X_train = scaler.fit_transform(X_train)
 X_test = scaler.transform(X_test)
 
-# Implementando o classificador KNN
-k = 5  # Exemplo de valor para k
-knn = KNeighborsClassifier(n_neighbors=k)
+# Treinar o modelo
+knn = KNNClassifier(k=5)
 knn.fit(X_train, y_train)
 y_pred = knn.predict(X_test)
 
-# Calculando as métricas
-accuracy = accuracy_score(y_test, y_pred)
-conf_matrix = confusion_matrix(y_test, y_pred)
+# Avaliação do modelo
+accuracy = np.mean(y_pred == y_test)
 precision = precision_score(y_test, y_pred, average='weighted')
 recall = recall_score(y_test, y_pred, average='weighted')
 f1 = f1_score(y_test, y_pred, average='weighted')
+conf_matrix = pd.crosstab(y_test, y_pred, rownames=['Real'], colnames=['Predito'])
 
 print("Acurácia:", accuracy)
-print("Matriz de Confusão:\n", conf_matrix)
 print("Precisão:", precision)
 print("Recall:", recall)
 print("F1-Score:", f1)
+print("Matriz de Confusão:\n", conf_matrix)
 
-# (Opcional) Plotando a Curva ROC e calculando a AUC para uma classe específica
-# Para problemas multiclasse, considere a abordagem "one vs. rest".
+# Visualizar Matriz de Confusão
+plt.figure(figsize=(6,4))
+sns.heatmap(conf_matrix, annot=True, fmt="d", cmap="Blues")
+plt.title("Matriz de Confusão")
+plt.ylabel("Real")
+plt.xlabel("Predito")
+plt.show()
